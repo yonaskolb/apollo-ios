@@ -235,7 +235,7 @@ struct SelectionSetTemplate {
 
   private func FragmentSelectionTemplate(_ fragment: IR.FragmentSpread) -> TemplateString {
     """
-    .fragment(\(fragment.definition.name.firstUppercased).self)
+    .fragment(\(config.config.schemaName).\(fragment.definition.name.firstUppercased).self)
     """
   }
 
@@ -351,7 +351,7 @@ struct SelectionSetTemplate {
     )
 
     return """
-    public var \(propertyName): \(typeName)\
+    public var \(propertyName): \(config.schemaName).\(typeName)\
     \(if: isOptional, "?") {\
     \(if: isMutable,
       """
@@ -446,7 +446,7 @@ fileprivate class SelectionSetNameCache {
       )
 
     } else {
-      return selectionSet.selections.merged.mergedSources
+      return "\(config.schemaName)." + selectionSet.selections.merged.mergedSources
         .first.unsafelyUnwrapped
         .generatedSelectionSetName(
           for: selectionSet,
