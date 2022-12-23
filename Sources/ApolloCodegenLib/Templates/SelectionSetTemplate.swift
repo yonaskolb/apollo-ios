@@ -91,6 +91,8 @@ struct SelectionSetTemplate {
     return """
     \(DataFieldAndInitializerTemplate())
 
+    \(FieldInitializerTemplate(selections, in: scope))
+
     \(ParentTypeTemplate(selectionSet.parentType))
     \(ifLet: selections.direct?.groupedByInclusionCondition, { SelectionsTemplate($0, in: scope) })
 
@@ -110,6 +112,29 @@ struct SelectionSetTemplate {
     """
     public \(isMutable ? "var" : "let") __data: DataDict
     public init(data: DataDict) { __data = data }
+    """
+  }
+
+  private func FieldInitializerTemplate(
+    _ selections: IR.SelectionSet.Selections,
+    in scope: IR.ScopeDescriptor) -> String {
+      func isConditionallyIncluded(_ field: IR.Field) -> Bool {
+        guard let conditions = field.inclusionConditions else { return false }
+        return !scope.matches(conditions)
+      }
+    let fields = (selections.direct?.fields ?? [:]).merging(selections.merged.fields) { $1 }
+    return """
+    public init(
+      \(fields.map {
+      "\($0.value.responseKey.firstLowercased.asFieldAccessorPropertyName): \(typeName(for: $0.value, forceOptional: isConditionallyIncluded($0.value)))"
+    }.joined(separator: ",\n  "))
+    ) {
+      var __data = DataDict([:], variables: nil)
+      \(fields.map {
+      "__data[\"\($0.value.responseKey)\"] = \($0.value.responseKey.firstLowercased.asFieldAccessorPropertyName)"
+    }.joined(separator: "\n  "))
+      self.__data = __data
+    }
     """
   }
 
