@@ -355,6 +355,8 @@ public struct ApolloCodegenConfiguration: Codable, Equatable {
     ///  Defaults to `true`.
     public let pruneGeneratedFiles: Bool
 
+    public let mutableFragments: Bool
+
     /// Default property values
     public struct Default {
       public static let additionalInflectionRules: [InflectionRule] = []
@@ -366,6 +368,7 @@ public struct ApolloCodegenConfiguration: Codable, Equatable {
       public static let warningsOnDeprecatedUsage: Composition = .include
       public static let conversionStrategies: ConversionStrategies = .init()
       public static let pruneGeneratedFiles: Bool = true
+      public static let mutableFragments: Bool = false
     }
 
     /// Designated initializer.
@@ -395,7 +398,8 @@ public struct ApolloCodegenConfiguration: Codable, Equatable {
       cocoapodsCompatibleImportStatements: Bool = Default.cocoapodsCompatibleImportStatements,
       warningsOnDeprecatedUsage: Composition = Default.warningsOnDeprecatedUsage,
       conversionStrategies: ConversionStrategies = Default.conversionStrategies,
-      pruneGeneratedFiles: Bool = Default.pruneGeneratedFiles
+      pruneGeneratedFiles: Bool = Default.pruneGeneratedFiles,
+      mutableFragments: Bool = Default.mutableFragments
     ) {
       self.additionalInflectionRules = additionalInflectionRules
       self.queryStringLiteralFormat = queryStringLiteralFormat
@@ -406,6 +410,7 @@ public struct ApolloCodegenConfiguration: Codable, Equatable {
       self.warningsOnDeprecatedUsage = warningsOnDeprecatedUsage
       self.conversionStrategies = conversionStrategies
       self.pruneGeneratedFiles = pruneGeneratedFiles
+      self.mutableFragments = mutableFragments
     }
 
     // MARK: Codable
@@ -420,6 +425,7 @@ public struct ApolloCodegenConfiguration: Codable, Equatable {
       case warningsOnDeprecatedUsage
       case conversionStrategies
       case pruneGeneratedFiles
+      case mutableFragments
     }
 
     public init(from decoder: Decoder) throws {
@@ -469,6 +475,11 @@ public struct ApolloCodegenConfiguration: Codable, Equatable {
         Bool.self,
         forKey: .pruneGeneratedFiles
       ) ?? Default.pruneGeneratedFiles
+
+      mutableFragments = try values.decodeIfPresent(
+        Bool.self,
+        forKey: .mutableFragments
+      ) ?? Default.mutableFragments
     }
   }
 
