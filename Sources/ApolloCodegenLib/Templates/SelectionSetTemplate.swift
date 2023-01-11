@@ -22,7 +22,7 @@ struct SelectionSetTemplate {
     TemplateString(
     """
     public struct Data: \(SelectionSetType()) {
-      \(BodyTemplate(operation.rootField.selectionSet))
+      \(BodyTemplate(operation.rootField.selectionSet, typeName: "Query"))
     }
     """
     ).description
@@ -34,7 +34,7 @@ struct SelectionSetTemplate {
     """
     \(SelectionSetNameDocumentation(field.selectionSet))
     public struct \(field.formattedSelectionSetName(with: config.pluralizer)): \(SelectionSetType()) {
-      \(BodyTemplate(field.selectionSet))
+      \(BodyTemplate(field.selectionSet, typeName: field.selectionSet.parentType.name))
     }
     """
     ).description
@@ -46,7 +46,7 @@ struct SelectionSetTemplate {
     """
     \(SelectionSetNameDocumentation(inlineFragment))
     public struct \(inlineFragment.renderedTypeName): \(SelectionSetType(asInlineFragment: true)) {
-      \(BodyTemplate(inlineFragment))
+      \(BodyTemplate(inlineFragment, typeName: inlineFragment.parentType.name))
     }
     """
     ).description
@@ -85,13 +85,13 @@ struct SelectionSetTemplate {
   }
 
   // MARK: - Body
-  func BodyTemplate(_ selectionSet: IR.SelectionSet) -> TemplateString {
+  func BodyTemplate(_ selectionSet: IR.SelectionSet, typeName: String) -> TemplateString {
     let selections = selectionSet.selections
     let scope = selectionSet.typeInfo.scope
     return """
     \(DataFieldAndInitializerTemplate())
 
-    \(FieldInitializerTemplate(selections, in: scope))
+    \(FieldInitializerTemplate(selections, in: scope, typeName: typeName))
 
     \(ParentTypeTemplate(selectionSet.parentType))
     \(ifLet: selections.direct?.groupedByInclusionCondition, { SelectionsTemplate($0, in: scope) })
@@ -117,7 +117,8 @@ struct SelectionSetTemplate {
 
   private func FieldInitializerTemplate(
     _ selections: IR.SelectionSet.Selections,
-    in scope: IR.ScopeDescriptor) -> String {
+    in scope: IR.ScopeDescriptor,
+    typeName: String) -> String {
       func isConditionallyIncluded(_ field: IR.Field) -> Bool {
         guard let conditions = field.inclusionConditions else { return false }
         return !scope.matches(conditions)
@@ -126,10 +127,10 @@ struct SelectionSetTemplate {
     return """
     public init(
       \(fields.map {
-      "\($0.value.responseKey.firstLowercased.asFieldAccessorPropertyName): \(typeName(for: $0.value, forceOptional: isConditionallyIncluded($0.value)))"
+          "\($0.value.responseKey.firstLowercased.asFieldAccessorPropertyName): \(self.typeName(for: $0.value, forceOptional: isConditionallyIncluded($0.value)))"
     }.joined(separator: ",\n  "))
     ) {
-      var __data = DataDict([:], variables: nil)
+      var __data = DataDict(["__typename": "\(typeName)"], variables: nil)
       \(fields.map {
       "__data[\"\($0.value.responseKey)\"] = \($0.value.responseKey.firstLowercased.asFieldAccessorPropertyName)"
     }.joined(separator: "\n  "))
