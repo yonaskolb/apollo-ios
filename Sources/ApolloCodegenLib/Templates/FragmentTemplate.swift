@@ -23,13 +23,13 @@ struct FragmentTemplate: TemplateRenderer {
       \(SelectionSetTemplate(
         mutable: isMutable,
         config: config
-      ).BodyTemplate(fragment.rootField.selectionSet))
+      ).BodyTemplate(fragment.rootField.selectionSet, typeName: fragment.name))
     }
 
     """)
   }
 
   private var isMutable: Bool {
-    fragment.definition.isLocalCacheMutation
+    config.options.mutableFragments
   }
 }

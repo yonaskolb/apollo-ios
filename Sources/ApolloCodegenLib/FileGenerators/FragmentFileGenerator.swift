@@ -12,5 +12,5 @@ struct FragmentFileGenerator: FileGenerator {
     config: config
   ) }
   var target: FileTarget { .fragment(irFragment.definition) }
-  var fileName: String { irFragment.definition.name }
+  var fileName: String { irFragment.definition.name + (irFragment.definition.name.hasSuffix("Fragment") ? "" : "Fragment") }
 }

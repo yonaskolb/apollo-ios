@@ -8,7 +8,7 @@ struct SelectionSetTemplate {
   private let nameCache: SelectionSetNameCache
 
   init(
-    mutable: Bool = false,
+    mutable: Bool = true,
     config: ApolloCodegen.ConfigurationContext
   ) {
     self.isMutable = mutable
@@ -22,7 +22,7 @@ struct SelectionSetTemplate {
     TemplateString(
     """
     public struct Data: \(SelectionSetType()) {
-      \(BodyTemplate(operation.rootField.selectionSet))
+      \(BodyTemplate(operation.rootField.selectionSet, typeName: "Query"))
     }
     """
     ).description
@@ -34,7 +34,7 @@ struct SelectionSetTemplate {
     """
     \(SelectionSetNameDocumentation(field.selectionSet))
     public struct \(field.formattedSelectionSetName(with: config.pluralizer)): \(SelectionSetType()) {
-      \(BodyTemplate(field.selectionSet))
+      \(BodyTemplate(field.selectionSet, typeName: field.selectionSet.parentType.name))
     }
     """
     ).description
@@ -46,7 +46,7 @@ struct SelectionSetTemplate {
     """
     \(SelectionSetNameDocumentation(inlineFragment))
     public struct \(inlineFragment.renderedTypeName): \(SelectionSetType(asInlineFragment: true)) {
-      \(BodyTemplate(inlineFragment))
+      \(BodyTemplate(inlineFragment, typeName: inlineFragment.parentType.name))
     }
     """
     ).description
@@ -85,11 +85,13 @@ struct SelectionSetTemplate {
   }
 
   // MARK: - Body
-  func BodyTemplate(_ selectionSet: IR.SelectionSet) -> TemplateString {
+  func BodyTemplate(_ selectionSet: IR.SelectionSet, typeName: String) -> TemplateString {
     let selections = selectionSet.selections
     let scope = selectionSet.typeInfo.scope
     return """
     \(DataFieldAndInitializerTemplate())
+
+    \(FieldInitializerTemplate(selections, in: scope, typeName: typeName))
 
     \(ParentTypeTemplate(selectionSet.parentType))
     \(ifLet: selections.direct?.groupedByInclusionCondition, { SelectionsTemplate($0, in: scope) })
@@ -110,6 +112,30 @@ struct SelectionSetTemplate {
     """
     public \(isMutable ? "var" : "let") __data: DataDict
     public init(data: DataDict) { __data = data }
+    """
+  }
+
+  private func FieldInitializerTemplate(
+    _ selections: IR.SelectionSet.Selections,
+    in scope: IR.ScopeDescriptor,
+    typeName: String) -> String {
+      func isConditionallyIncluded(_ field: IR.Field) -> Bool {
+        guard let conditions = field.inclusionConditions else { return false }
+        return !scope.matches(conditions)
+      }
+    let fields = (selections.direct?.fields ?? [:]).merging(selections.merged.fields) { $1 }
+    return """
+    public init(
+      \(fields.map {
+          "\($0.value.responseKey.firstLowercased.asFieldAccessorPropertyName): \(self.typeName(for: $0.value, forceOptional: isConditionallyIncluded($0.value)))"
+    }.joined(separator: ",\n  "))
+    ) {
+      var __data = DataDict(["__typename": "\(typeName)"], variables: nil)
+      \(fields.map {
+      "__data[\"\($0.value.responseKey)\"] = \($0.value.responseKey.firstLowercased.asFieldAccessorPropertyName)"
+    }.joined(separator: "\n  "))
+      self.__data = __data
+    }
     """
   }
 
@@ -235,7 +261,7 @@ struct SelectionSetTemplate {
 
   private func FragmentSelectionTemplate(_ fragment: IR.FragmentSpread) -> TemplateString {
     """
-    .fragment(\(fragment.definition.name.firstUppercased).self)
+    .fragment(\(config.config.schemaName).\(fragment.definition.name.firstUppercased).self)
     """
   }
 
@@ -351,7 +377,7 @@ struct SelectionSetTemplate {
     )
 
     return """
-    public var \(propertyName): \(typeName)\
+    public var \(propertyName): \(config.schemaName).\(typeName)\
     \(if: isOptional, "?") {\
     \(if: isMutable,
       """
@@ -446,7 +472,7 @@ fileprivate class SelectionSetNameCache {
       )
 
     } else {
-      return selectionSet.selections.merged.mergedSources
+      return "\(config.schemaName)." + selectionSet.selections.merged.mergedSources
         .first.unsafelyUnwrapped
         .generatedSelectionSetName(
           for: selectionSet,
